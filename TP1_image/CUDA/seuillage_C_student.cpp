@@ -18,17 +18,17 @@
 ////////////////////////////////////////////////////////////////////////////////
 //! Compute reference data set
 ////////////////////////////////////////////////////////////////////////////////
-void seuillage_C(float image_out[][SIZE_J][SIZE_I],
+void seuillage_C_ij(float image_out[][SIZE_J][SIZE_I],
                  float image_in[][SIZE_J][SIZE_I]) {
-  float mu_r[SIZE_J][SIZE_I];
-  float mu_r_seuil[SIZE_J][SIZE_I];
+  float mu_r;
+
   for (int i = 0; i < SIZE_I; i++) {
     for (int j = 0; j < SIZE_J; j++) {
-      mu_r[j][i] = image_in[0][j][i] /
+      mu_r = image_in[0][j][i] /
                    pow((pow(image_in[0][j][i], 2) + pow(image_in[1][j][i], 2) +
                         pow(image_in[2][j][i], 2)),
                        0.5f);
-      if (mu_r[j][i] > 0.7) {
+      if (mu_r > 0.7) {
         image_out[0][j][i] = image_in[0][j][i];
         image_out[1][j][i] = image_in[0][j][i];
         image_out[2][j][i] = image_in[2][j][i];
@@ -43,7 +43,7 @@ void seuillage_C(float image_out[][SIZE_J][SIZE_I],
 
 // Boucles inversées
 
-void seuillage_C_ij(float image_out[][SIZE_J][SIZE_I],
+void seuillage_C_ji(float image_out[][SIZE_J][SIZE_I],
                     float image_in[][SIZE_J][SIZE_I]) {
   float mu_r;
 
@@ -65,3 +65,16 @@ void seuillage_C_ij(float image_out[][SIZE_J][SIZE_I],
     }
   }
 }
+
+
+// temps matlab 
+// V1 : 53.5ms
+// V2 : 15.8ms
+// V3 : 11.3ms
+
+// temps C
+// ij : 101.724861
+// ji : 99.072701
+
+// temps Cuda
+// 48.971455

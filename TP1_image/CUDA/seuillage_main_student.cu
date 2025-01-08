@@ -34,18 +34,18 @@ using namespace std;
 __global__ void seuillage_kernel(float d_image_in[][SIZE_J][SIZE_I],float d_image_out[][SIZE_J][SIZE_I])
 {
 	int i,j;
-	int i_fisrt, j_first;
+	int i_first, j_first;
 	
 	
-	i_fisrt = blockIdx.x * TAILLE_BLOC_X ;
+	i_first = blockIdx.x * TAILLE_BLOC_X ;
 	j_first = blockIdx.y * TAILLE_BLOC_Y ;
 
 	i=i_first + threadIdx.x ;
 	j=j_first + threadIdx.y ;
 
-	float mu_r = image_in[0][j][i] /
-				pow((pow(image_in[0][j][i], 2) + pow(image_in[1][j][i], 2) +
-						pow(image_in[2][j][i], 2)),
+	float mu_r = d_image_in[0][j][i] /
+				pow((pow(d_image_in[0][j][i], 2) + pow(d_image_in[1][j][i], 2) +
+						pow(d_image_in[2][j][i], 2)),
 					0.5f);
 	if (mu_r > 0.7) {
 		d_image_out[0][j][i] = d_image_in[0][j][i];
@@ -115,7 +115,7 @@ runTest( int argc, char** argv)
 	// Image trait�e sur le CPU
 	float* h_image_out_CPU = (float*) malloc( mem_size);
 
-	printf("Seuillage CPU ij d'une image couleur \n");
+	printf("\nSeuillage CPU ij d'une image couleur \n");
 
 	cudaEvent_t start,stop;
 	error = cudaEventCreate(&start);
@@ -150,32 +150,31 @@ runTest( int argc, char** argv)
 
 
 	// Image trait�e sur le CPU
-	float* h_image_out_CPU = (float*) malloc( mem_size);
 
 	printf("Seuillage CPU ji d'une image couleur \n");
 
-	cudaEvent_t start,stop;
-	error = cudaEventCreate(&start);
-	error = cudaEventCreate(&stop);
+	cudaEvent_t start2,stop2;
+	error = cudaEventCreate(&start2);
+	error = cudaEventCreate(&stop2);
 
 	// Record the start event
-	error = cudaEventRecord(start, NULL);
-	error = cudaEventSynchronize(start);
+	error = cudaEventRecord(start2, NULL);
+	error = cudaEventSynchronize(start2);
 	//Seuillage sur CPU
 	seuillage_C_ji( (float (*)[SIZE_J][SIZE_I])h_image_out_CPU, (float (*)[SIZE_J][SIZE_I])h_image_in);
 
 	// Record the start event
-	error = cudaEventRecord(stop, NULL);
+	error = cudaEventRecord(stop2, NULL);
 	// Wait for the stop event to complete
-	error = cudaEventSynchronize(stop);
-	float msecTotal = 0.0f;
-	error = cudaEventElapsedTime(&msecTotal, start, stop);
+	error = cudaEventSynchronize(stop2);
+
+	error = cudaEventElapsedTime(&msecTotal, start2, stop2);
 
 
 	printf("CPU execution time for ji %f\n",msecTotal);
 
 	//Sauvegarde de l'image resultat
-	char name_file_out_CPU[512];
+
 	sprintf(name_file_out_CPU,"%s/ferrari_out_CPU_ji.raw",argv[1]);
 	file_ptr=fopen(name_file_out_CPU,"wb");
 	fwrite(h_image_out_CPU,sizeof(float),3*SIZE_J*SIZE_I,file_ptr);
@@ -250,7 +249,7 @@ runTest( int argc, char** argv)
 	error = cudaEventElapsedTime(&msecMem2, start_mem, stop);
 	msecMem+=msecMem2;
 
-	printf("GPU execution time %f ms (memory management %2.2f \%)\n",msecTotal,(msecMem)/(msecTotal)*100);
+	printf("GPU execution time %f ms (memory management %2.2f %)\n",msecTotal,(msecMem)/(msecTotal)*100);
 
 	// Enregistrement de l'image de sortie sur un fichier
 	char name_file_out_GPU[512];
