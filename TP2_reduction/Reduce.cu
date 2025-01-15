@@ -37,13 +37,15 @@ __global__ void reduce_kernel( int n, const int *in_buffer, int *out_buffer, con
 {
   // Allocate shared memory inside the block.
   extern __shared__ int s_mem[];
-float my_sum=0;
+  int my_sum=0;
   // The range of data to work with.
   int2 range = block_ranges[blockIdx.x];
 
   // Compute the sum of my elements.
   
-  // TODO: fill-in that section of the code
+  for(int i = range.x ; i<range.y ; i += blockDim.x){
+    my_sum+=in_buffer[i + threadIdx.x];
+  }
 
   // Copy my sum in shared memory.
   s_mem[threadIdx.x] = my_sum;
@@ -53,12 +55,18 @@ float my_sum=0;
 
   // Compute the sum inside the block.
   
-  // TODO: fill-in that section of the code
-
+  for(int i = 1; i<blockDim.x;i*=2){
+    if(threadIdx.x %(2*i) ==0){
+      s_mem[threadIdx.x]+=s_mem[threadIdx.x + i];
+    }
+    __syncthreads();
+  }
+  
   // The first thread of the block stores its result.
   if( threadIdx.x == 0 )
     out_buffer[blockIdx.x] = s_mem[0];
 }
+
 
 int reduce_on_gpu( int n, const int *a_device )
 {
@@ -124,7 +132,7 @@ __global__ void reduce_kernel_optimized( int n, const int *in_buffer, int *out_b
 {
   // The number of warps in the block.
   const int NUM_WARPS = BLOCK_DIM / WARP_SIZE;
-float my_sum=0;
+  int my_sum=0;
   // Allocate shared memory inside the block.
   __shared__ volatile int s_mem[BLOCK_DIM];
 
@@ -137,33 +145,43 @@ float my_sum=0;
 
   // Compute the sum of my elements.
   
-  // TODO: fill-in that section of the code
-
+  for (int i = range.x + threadIdx.x; i < range.y; i += BLOCK_DIM) {
+    my_sum += in_buffer[i];
+  }
   // Copy my sum in shared memory.
-  s_mem[threadIdx.x] = my_sum;
+  // s_mem[threadIdx.x] = my_sum;
 
   // Compute the sum inside each warp.
- 
-  // TODO: fill-in that section of the code
+  
+  for(int i = WARP_SIZE/2; i>0; i>>=1){
+    my_sum+=__shfl_down_sync(0xffffffff, my_sum, i);
+  }
+
+  
   
   // Each warp leader stores the result for the warp.
   if( lane_id == 0 )
-    // TODO: fill-in that section of the code
+    s_mem[warp_id] = my_sum;
   __syncthreads();
 
   if( warp_id == 0 )
   {
+    
+    my_sum = s_mem[threadIdx.x];
+    
     // Read my value from shared memory and store it in a register.
-    my_sum = s_mem[lane_id];
+    // my_sum = s_mem[lane_id];
   
     // Sum the results of the warps.
-    
+    for (int i=NUM_WARPS/2;i>0;i>>=1){
+      my_sum+=__shfl_down_sync(0xffffffff, my_sum, i);
+    }
     // TODO: fill-in that section of the code
   }
 
   // The 1st thread stores the result of the block.
   if( threadIdx.x == 0 )
-    out_buffer[blockIdx.x] = my_sum += s_mem[1];
+    out_buffer[blockIdx.x] = my_sum;
 }
 
 template< int BLOCK_DIM >
@@ -228,7 +246,7 @@ int main( int, char ** )
   const int NUM_TESTS = 10;
 
   // The number of elements in the problem.
-  const int N = 512 * 131072;
+  const int N = 256*256*2*8*8;//512 * 131072;
 
   std::cout << "Computing a reduction on " << N << " elements" << std::endl;
 
@@ -249,10 +267,10 @@ int main( int, char ** )
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   std::cout << "Filling with 1s" << std::endl;
-
+  srand(time(NULL));
   // Generate pseudo-random data.
   for( int i = 0 ; i < N ; ++i )
-    a_host[i] = 1;
+    a_host[i] = rand()%5;
   
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -456,3 +474,29 @@ int main( int, char ** )
   return 0;
 }
 
+
+// $ make && ./reduce
+// [100%] Built target reduce
+// Computing a reduction on 67108864 elements
+// Filling with 1s
+
+// Computing on the CPU using 1 CPU thread
+//   Elapsed time: 119.067ms
+
+// Computing on the CPU using 20 OpenMP thread(s)
+//   Elapsed time: 7.52683ms
+
+// Computing on the GPU using Thrust (transfers excluded)
+//   Elapsed time: 4.37584ms
+
+// Computing on the GPU (transfers excluded)
+//   Elapsed time: 5.43392ms
+
+// Computing on the GPU using a tuned version (transfers excluded)
+//   Elapsed time: 3.80089ms
+
+
+// OpenMP      results: ref= 134189865 / sum= 134189865
+// Thrust      results: ref= 134189865 / sum= 134189865
+// CUDA        results: ref= 134189865 / sum= 134189865
+// CUDA Optim  results: ref= 134189865 / sum= 134189865

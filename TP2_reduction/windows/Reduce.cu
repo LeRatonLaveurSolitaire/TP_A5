@@ -31,13 +31,15 @@ __global__ void reduce_kernel( int n, const int *in_buffer, int *out_buffer, con
 {
   // Allocate shared memory inside the block.
   extern __shared__ int s_mem[];
-
+  int my_sum=0;
   // The range of data to work with.
   int2 range = block_ranges[blockIdx.x];
 
   // Compute the sum of my elements.
   
-  // TODO: fill-in that section of the code
+  for(int i = range.x  ; i<range.y ; i += blockDim.x){
+    my_sum+=in_buffer[i];
+  }
 
   // Copy my sum in shared memory.
   s_mem[threadIdx.x] = my_sum;
@@ -47,8 +49,13 @@ __global__ void reduce_kernel( int n, const int *in_buffer, int *out_buffer, con
 
   // Compute the sum inside the block.
   
-  // TODO: fill-in that section of the code
-
+  for(int i = 1; i<blockDim.x;i*=2){
+    if(threadIdx.x %(2*i) ==0){
+      s_mem[threadIdx.x]+=s_mem[threadIdx.x+ i]
+    }
+    __syncthreads();
+  }
+  
   // The first thread of the block stores its result.
   if( threadIdx.x == 0 )
     out_buffer[blockIdx.x] = s_mem[0];
